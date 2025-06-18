@@ -66,7 +66,7 @@ describe('UrlService', () => {
     it('should throw ConflictException if alias exists', async () => {
       urlRepo.findOneBy.mockResolvedValue({ shortUrl: 'taken' });
       await expect(
-        service.createShortUrl({ originalUrl: '', alias: 'taken' }),
+        service.createShortUrl({ originalUrl: '', alias: 'taken' })
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -103,7 +103,7 @@ describe('UrlService', () => {
     it('should throw NotFoundException if not found', async () => {
       urlRepo.findOne.mockResolvedValue(null);
       await expect(service.getOriginalUrl('notfound', 'ip')).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
 
@@ -114,7 +114,7 @@ describe('UrlService', () => {
         expiresAt: new Date('2000-01-01'),
       });
       await expect(service.getOriginalUrl('x', 'ip')).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
   });
@@ -136,7 +136,7 @@ describe('UrlService', () => {
     it('should throw NotFoundException if not found', async () => {
       urlRepo.findOne.mockResolvedValue(null);
       await expect(service.getUrlInfo('404')).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
   });
@@ -158,7 +158,7 @@ describe('UrlService', () => {
     it('should throw NotFoundException if URL not found', async () => {
       urlRepo.findOne.mockResolvedValue(null);
       await expect(service.getAnalytics('x')).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
   });
@@ -176,7 +176,7 @@ describe('UrlService', () => {
     it('should throw NotFoundException if URL not found', async () => {
       urlRepo.findOne.mockResolvedValue(null);
       await expect(service.deleteUrl('notfound')).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
   });

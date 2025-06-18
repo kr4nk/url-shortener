@@ -25,7 +25,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-    command: npm run start:prod
+    command: npm run start:dev
 
   frontend:
     build: ./frontend
@@ -38,6 +38,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: npm run build && npm run preview
+    command: npm run dev -- --host
 volumes:
   pg_data:

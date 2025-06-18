@@ -1,179 +1,88 @@
-import { useEffect, useState, useCallback } from 'preact/hooks'
-import {
-  shortenUrl,
-  getAnalytics,
-  deleteUrl,
-  getUrlInfo,
-  fetchAllUrls,
-} from './api'
-import type { UrlEntry } from './types'
+import { useEffect, useState, useCallback } from 'preact/hooks';
+import { shortenUrl, deleteUrl, getUrlInfo, fetchAllUrls } from './api';
+import type { UrlEntry } from './types';
+import UrlForm from './components/UrlForm';
+import UrlList from './components/UrlList';
 
 export default function App() {
-  const [form, setForm] = useState({
-    originalUrl: '',
-    alias: '',
-    expiresAt: '',
-  })
-  const [urls, setUrls] = useState<UrlEntry[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [urls, setUrls] = useState<UrlEntry[]>([]); //redo
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [successShort, setSuccessShort] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true)
+    setLoading(true);
     fetchAllUrls()
-      .then((data) => setUrls(data))
+      .then((data) => {
+        setUrls(
+          data.sort(
+            (a: UrlEntry, b: UrlEntry) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+        );
+      })
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => setLoading(false));
+  }, []);
 
-  useEffect(() => {
-    const path = window.location.pathname.slice(1)
-    const isApiRoute = path.startsWith('api') || path === ''
-    if (!isApiRoute) {
-      window.location.href = `http://localhost:3000/${path}`
-    }
-  }, [])
-
-  const handleShorten = useCallback(async () => {
-    setLoading(true)
+  async function doShorten(data: UrlEntry) {
     try {
-      const res = await shortenUrl(form)
-      const code = res.data.shortUrl.split('/').pop()
+      const cleanData = {
+        ...data,
+        alias: data.alias?.trim() === '' ? undefined : data.alias,
+      };
+      const res = await shortenUrl(cleanData);
+      const info = await getUrlInfo(res.data.shortUrl);
 
-      const info = await getUrlInfo(code)
-      const enrichedInfo: UrlEntry = {
+      const newEntry: UrlEntry = {
         shortUrl: res.data.shortUrl,
         originalUrl: info.data.originalUrl,
         createdAt: info.data.createdAt,
         clickCount: info.data.clickCount,
         expiresAt: info.data.expiresAt,
-        analytics: info.data.analytics || undefined,
-      }
+        analytics: info.data.analytics,
+      };
 
-      setUrls((prev) => [...prev, enrichedInfo])
-      setForm({ originalUrl: '', alias: '', expiresAt: '' })
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error shortening URL')
+      setUrls((prev) => [newEntry, ...prev]);
+      setSuccessShort(res.data.shortUrl);
+      setTimeout(() => setSuccessShort(null), 2000);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Error shortening URL');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [form])
+  }
 
-  const handleDelete = useCallback(async (shortUrl: string) => {
-    setError('')
+  const onDelete = useCallback(async (s: string) => {
     try {
-      await deleteUrl(shortUrl)
-      setUrls((prev) => prev.filter((u) => u.shortUrl !== shortUrl))
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error deleting URL')
+      await deleteUrl(s);
+      setUrls((prev) => prev.filter((u) => u.shortUrl !== s));
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Delete failed');
     }
-  }, [])
-
-  const handleAnalytics = useCallback(async (shortUrl: string) => {
-    setError('')
-    try {
-      const res = await getAnalytics(shortUrl)
-      setUrls((prev) =>
-        prev.map((entry) =>
-          entry.shortUrl === shortUrl
-            ? ({ ...entry, analytics: res.data } as UrlEntry)
-            : entry
-        )
-      )
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error loading analytics')
-    }
-  }, [])
+  }, []);
 
   return (
-    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
-      <h1>URL Shortener</h1>
-      <div style={{ marginBottom: 16 }}>
-        <input
-          placeholder='Original URL'
-          value={form.originalUrl}
-          onInput={(e) =>
-            setForm({ ...form, originalUrl: e.currentTarget.value })
-          }
-          style={{ marginRight: 8 }}
-          disabled={loading}
+    <div
+      class='text-gray-800 py-12 px-4 rounded-2xl shadow-sm border border-solid border-white'
+      style={
+        'background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(5px);'
+      }
+    >
+      <div class='space-y-8'>
+        <h1 class='text-center text-4xl font-bold tracking-tight text-shadow-[1px_1px_1px_rgba(255_255_255/_1)]'>
+          URL Shortener
+        </h1>
+        <UrlForm
+          onSubmit={doShorten}
+          loading={loading}
+          error={error}
+          successShort={successShort}
         />
-        <input
-          placeholder='Alias (optional)'
-          value={form.alias}
-          onInput={(e) => setForm({ ...form, alias: e.currentTarget.value })}
-          style={{ marginRight: 8 }}
-          disabled={loading}
-        />
-        <input
-          type='date'
-          value={form.expiresAt}
-          onInput={(e) =>
-            setForm({ ...form, expiresAt: e.currentTarget.value })
-          }
-          style={{ marginRight: 8 }}
-          disabled={loading}
-        />
-        <button onClick={handleShorten} disabled={loading}>
-          Shorten
-        </button>
+        {error && <div class='text-red-400 text-sm'>{error}</div>}
+        {loading && <div class='text-center text-gray-400'>Loading...</div>}
+        <UrlList urls={urls} onDelete={onDelete} />
       </div>
-      {error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
-      {loading && <div>Loading...</div>}
-      <table cellPadding='8' style={{ borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th>Short URL</th>
-            <th>Original URL</th>
-            <th>Created At</th>
-            <th>Clicks</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {urls.map((url) => (
-            <tr key={url.shortUrl}>
-              <td>
-                <a
-                  href={url.shortUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  {url.shortUrl}
-                </a>
-              </td>
-              <td>{url.originalUrl}</td>
-              <td>{new Date(url.createdAt).toLocaleString()}</td>
-              <td>{url.clickCount}</td>
-              <td>
-                <button
-                  onClick={() => handleDelete(url.shortUrl)}
-                  disabled={loading}
-                  style={{ marginRight: 8 }}
-                >
-                  Delete
-                </button>
-                <button
-                  onClick={() => handleAnalytics(url.shortUrl)}
-                  disabled={loading}
-                >
-                  Show Stats
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {urls.map(
-        (url) =>
-          url.analytics && (
-            <div key={`${url.shortUrl}-analytics`} style={{ marginTop: 8 }}>
-              <strong>Analytics for {url.shortUrl}:</strong>
-              <div>Clicks: {url.analytics.totalClicks}</div>
-              <div>Last IPs: {url.analytics.recentIps.join(', ')}</div>
-            </div>
-          )
-      )}
     </div>
-  )
+  );
 }
